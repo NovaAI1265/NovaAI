@@ -1,1 +1,206 @@
 https://github.com/NovaAI1265/NovaAI.git
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nova AI Web</title>
+<style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    background: black;
+    font-family: Arial, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Star background */
+  #stars {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    opacity: 0.8;
+    animation: twinkle 2s infinite;
+  }
+
+  @keyframes twinkle {
+    0%,100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+
+  #chat-container {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    overflow: hidden;
+  }
+
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 10px;
+  }
+
+  .message {
+    margin: 5px;
+    padding: 10px;
+    border-radius: 10px;
+    max-width: 70%;
+    color: white;
+  }
+
+  .user { background-color: #3b82f6; margin-left: auto; }
+  .nova { background-color: #8b5cf6; margin-right: auto; }
+
+  #input-container {
+    display: flex;
+    gap: 10px;
+  }
+
+  #input {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    outline: none;
+  }
+
+  #send {
+    padding: 10px 20px;
+    background: #8b5cf6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+</style>
+</head>
+<body>
+
+<div id="stars"></div>
+
+<div id="chat-container">
+  <div id="messages"></div>
+  <div id="input-container">
+    <input type="text" id="input" placeholder="Ask Nova AI...">
+    <button id="send">Send</button>
+  </div>
+</div>
+
+<script>
+  // Create stars
+  const starsDiv = document.getElementById('stars');
+  for(let i=0;i<150;i++){
+    let star = document.createElement('div');
+    star.classList.add('star');
+    star.style.width = star.style.height = Math.random()*3 + 'px';
+    star.style.top = Math.random()*100 + '%';
+    star.style.left = Math.random()*100 + '%';
+    starsDiv.appendChild(star);
+  }
+
+  // Chat logic
+  const messagesDiv = document.getElementById('messages');
+  const input = document.getElementById('input');
+  const sendBtn = document.getElementById('send');
+
+  // Save chats locally
+  let chatHistory = JSON.parse(localStorage.getItem('novaChat') || '[]');
+
+  function renderChats() {
+    messagesDiv.innerHTML = '';
+    chatHistory.forEach(msg => {
+      let div = document.createElement('div');
+      div.classList.add('message');
+      div.classList.add(msg.isUser ? 'user' : 'nova');
+      div.textContent = msg.text;
+      messagesDiv.appendChild(div);
+    });
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
+
+  renderChats();
+
+  function saveChat() {
+    localStorage.setItem('novaChat', JSON.stringify(chatHistory));
+  }
+
+  function mentalHealthCheck(text) {
+    const lower = text.toLowerCase();
+    if(lower.includes('sad') || lower.includes('depressed')) return "I'm really sorry you're feeling that way. 💙 It can help to talk to someone you trust. You're not alone.";
+    if(lower.includes('anxious') || lower.includes('anxiety')) return "Anxiety can feel overwhelming. Try taking a slow deep breath: inhale 4 sec, hold 4, exhale 4.";
+    if(lower.includes('stressed')) return "Stress happens to everyone. Maybe take a short break, drink water, or go for a quick walk.";
+    if(lower.includes('lonely')) return "Feeling lonely is tough. Maybe message a friend or spend time with someone you trust.";
+    return null;
+  }
+
+  async function sendMessage() {
+    const userText = input.value.trim();
+    if(!userText) return;
+
+    chatHistory.push({text:userText, isUser:true});
+    renderChats();
+    input.value = '';
+
+    // Check mental health keywords first
+    const mh = mentalHealthCheck(userText);
+    if(mh){
+      chatHistory.push({text:mh,isUser:false});
+      renderChats();
+      saveChat();
+      return;
+    }
+
+    // Typing animation
+    const typingDiv = {text:"Nova AI is typing...", isUser:false};
+    chatHistory.push(typingDiv);
+    renderChats();
+
+    // OpenRouter API call
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":"Bearer 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"
+      },
+      body: JSON.stringify({
+        model:"openai/gpt-4o-mini",
+        messages:[
+          {role:"system", content:"You are Nova AI, a friendly assistant that helps with homework, knowledge, and mental health."},
+          {role:"user", content:userText}
+        ]
+      })
+    });
+
+    const data = await response.json();
+    const aiText = data.choices?.[0]?.message?.content || "I don't know that yet.";
+    // Remove typing animation
+    chatHistory.pop();
+    chatHistory.push({text:aiText, isUser:false});
+    renderChats();
+    saveChat();
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  input.addEventListener('keypress', e=>{
+    if(e.key==='Enter') sendMessage();
+  });
+</script>
+
+</body>
+</html>
